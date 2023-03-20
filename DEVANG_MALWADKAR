@@ -1,0 +1,260 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+%matplotlib inline
+import seaborn as sns
+import plotly as px
+import ast
+from datetime import datetime
+
+#LOAD DATASET
+database = pd.read_csv('/content/drive/MyDrive/Colab Notebooks/Hotel Bookings.csv')
+
+#DATABASE FIRST LOOK
+database.head()
+
+#INFORMATION OF DATA
+database.info()
+
+print(database.index)
+print('\n')
+print(database.columns)
+
+#DATASER DUPLICATE VALUE COUNT, TO REMOVE THESE VALUE WE USE FUNCTION DROP.DUPLICATE TO DELET DUPLICATE ROWS 
+database.drop_duplicates(inplace=True)
+#total rows = 119390 , Duplicate rows = 31994
+uni_num_of_rows = database.shape[0]
+uni_num_of_rows #now unique rows is 87396
+
+database.reset_index()  #view unique data 
+
+#FINDING THE NULL VALUES 
+null_values = database.isnull()==True
+database.fillna(np.nan, inplace=True)
+database
+
+#SORTING THE MISSING VALUES AND CHECKING 
+miss_values=database.isnull().sum().sort_values(ascending=False)
+miss_values  #check the count values of null in individual columns 
+
+database.columns
+
+#ANALYSING THE DATASET THROUGH DESCRIBE
+database.describe()
+
+print(database.apply(lambda col: col.unique()))
+
+#to fill the null value with NaN in columns
+miss_values[:4]
+
+#what is the percentage of null value in each columns, starting from company
+percentage_company_null= miss_values[0]/uni_num_of_rows*100
+percentage_company_null
+
+#dropping the company column
+database.drop(['company'], axis=1, inplace = True)
+
+#checking the agent columns
+percentage_agent_null = miss_values[1]/uni_num_of_rows*100
+percentage_agent_null
+
+#as we have seen there is lot less null values in agent , so filling the null values with mode of all the values 
+database['agent'].fillna(value=0, inplace=True)
+database['agent'].isnull().sum() #we recheck the null value 
+
+#checking the null values for the country
+percentage_country_null = miss_values[2]/uni_num_of_rows*100
+percentage_country_null
+
+database['country'].fillna(value='others', inplace=True)
+database['country'].isnull().sum()
+
+#checking the null values for children also 
+percentage_children_null = miss_values[3]/uni_num_of_rows*100
+percentage_children_null
+
+database['children'].fillna(value=0, inplace=True)
+database['children'].isnull().sum()
+
+database.isnull().sum() #as we can see there is no null values 
+
+database.info()
+
+#as we can seen th children and agent values asre in float so we may change it to int 
+database[['children','agent']] = database[['children','agent']].astype('int64')
+
+#TOTAL STAYS IN NIGHTS    
+database['total_stay_in_nights'] = database['stays_in_week_nights'] + database['stays_in_weekend_nights']
+database['total_stay_in_nights'] #we have created a column for total stays in night by adding week night and weekend night
+
+#we have created a col for revenue using stay*adr
+
+database['revenue'] = database['total_stay_in_nights']*database['adr']
+database['revenue']
+
+#adding a col for total guest coming for each booking
+database['total_guest'] = database['adults'] + database['children'] + database['babies']
+database['total_guest'].sum()
+
+#for understanding the 'is_canceled': we will replace with the values from (0,1) to 'not cancled '
+database['is_canceled'] = database['is_canceled'].replace([0,1], ['not canceled','is canceled'])
+database['is_canceled']
+
+#same for 'is_repeated_guest' col
+database['is_repeated_guest'] = database['is_repeated_guest'].replace([0,1], ['not repeated','repeated'])
+database['is_repeated_guest']
+
+#check overall revenue hotel wise 
+hotel_wise_total_revenue = database.groupby('hotel')['revenue'].sum()
+hotel_wise_total_revenue
+
+database[['hotel','revenue']]
+
+
+def get_count_from_column_bar(df, column_label):
+  df_grpd = df[column_label].value_counts()
+  df_grpd = pd.DataFrame({'index': df_grpd.index, 'count': df_grpd.values})
+  return df_grpd
+
+
+def plot_bar_chart_from_column(df, column_label, t1):
+  df_grpd = get_count_from_column(df, column_label)
+  fig, ax = plt.subplots(figsize=(14,6))
+  c = ['g', 'r', 'b', 'c', 'y']
+  ax.bar(df_grpd['index'], df_grpd['count'], width = 0.4, align = 'edge', edgecolor = 'black', linewidth = 4, color= c, linestyle = ':', alpha = 1, )
+  plt.title(t1, bbox={'facecolor':'0.8', 'pad': 3})
+  plt.legend()
+  plt.ylabel('Count')
+  plt.xticks(rotation = 15)  #use to fomat the label of x-axis
+  plt.xlabel(column_label)
+  plt.show()
+  
+  
+  
+  def get_count_from_column(df, column_label):
+  df_grpd = df[column_label].value_counts()
+  df_grpd = pd.DataFrame({'index': df_grpd.index, 'count':df_grpd.values})
+  return df_grpd
+
+
+#plot a pie chart from grouped data 
+
+def plot_pie_chart_from_column(df, column_label, t1, exp):
+  df_grpd = get_count_from_column(df, column_label)
+  fig, ax = plt.subplots(figsize=(14,9))
+  ax.pie(df_grpd.loc[:, 'count'], labels = df_grpd.loc[:, 'index'], autopct = '%1.2f%%', startangle=90,shadow=True, labeldistance=1, explode = exp)
+  plt.title(t1, bbox = {'facecolor': '0.8', 'pad':3})
+  ax.axis('equal')
+  plt.legend()
+  plt.show()
+  
+  
+  exp1 =[0,0.2]
+plot_pie_chart_from_column(database, 'hotel','Booking percentage of Hotel by Name',exp1)
+
+#chart 2 
+exp4 = [0,0.2]
+plot_pie_chart_from_column(database,'is_canceled','Cancellation volume of hotel',exp4)
+
+#chart 3 visualization code.
+plot_bar_chart_from_column(database, 'distribution_channel', 'Distribution channel volume')
+
+#CHART-4
+exp2=[0.2,0,0,0,0,0,0,0,0,0,0,0.1]
+plot_pie_chart_from_column(database, 'arrival_date_month', 'Month wise booking ',exp2)
+
+#CHART-5
+exp3=[0,0.3]
+plot_pie_chart_from_column(database,'is_repeated_guest', 'Guest Repeating Status', exp3)
+
+#CHART-6
+plot_bar_chart_from_column(database,'assigned_room_type', 'Assignments of room by Type')
+
+guest_month_wise = pd.DataFrame(database[['arrival_date_month','total_guest']])
+guest_month_wise_df = guest_month_wise.groupby(['arrival_date_month'])['total_guest'].sum()
+guest_month_wise_df.sort_values(ascending=False, inplace=True)
+
+database['total_guest']
+
+#CHART-7
+market_segment_df = pd.DataFrame(database['market_segment'])
+market_segment_df_data = market_segment_df.groupby('market_segment')['market_segment'].count()
+market_segment_df_data.sort_values(ascending=False, inplace=True)
+plt.figure(figsize=(15,6))
+y=np.array([4,5,6])
+market_segment_df_data.plot(kind = 'bar', color=['g','r','c','b','y','black','brown'], fontsize = 20, legend = True)
+
+#CHART-8
+guest_country_wise = pd.DataFrame(database[['country', 'total_guest']])
+guest_country_wise_df = guest_country_wise.groupby(['country'])['total_guest'].sum()
+guest_country_wise_df.sort_values(ascending=False, inplace=True)
+top_10_country_wise_guest = guest_country_wise_df.head(10)
+#CHART-8
+guest_country_wise = database.groupby(['country'])['total_guest'].sum().reset_index()
+top_10_country_wise_guest = guest_country_wise.sort_values('total_guest', ascending=False).head(10)
+plt.figure(figsize=(12,6))
+sns.barplot(x='total_guest', y=top_10_country_wise_guest.index, data=top_10_country_wise_guest).set(title='TOP 10 COUNTRIES BY GUEST')
+print("\n\n PRT = Portugal\nGBR = Great Britain & Northern Ireland\nFRA = France\nESp = Spain\nDEU = Germany\nITA = Italy\nIRL = Ireland\nBRA = Brazil\nBEL = Belgium\nNLD = Netherland")
+
+
+#CHART-9
+
+order = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+
+order_hotel_df = database[database['is_canceled'] == 'not canceled']['arrival_date_month'].value_counts().reindex(order).fillna(0)
+
+plt.subplots(figsize=(10,6))
+ticks = np.arange(0, 150, 20)
+labels = ["{}".format(i//1) for i in ticks]
+plt.yticks(ticks, labels)
+
+plt.xticks(rotation=60)
+
+for xy in zip(order_hotel_df.index, order_hotel_df.values):
+    plt.annotate(text="{}".format(int(xy[1])), xy=xy, xytext=(0, 10), textcoords='offset points')
+
+plt.bar(order_hotel_df.index, order_hotel_df.values, color='r', alpha=0.5)
+
+plt.xlabel("Months", fontdict={'fontsize':12, 'fontweight':5, 'color':'Brown'})
+plt.ylabel("Counts", fontdict={'fontsize':12, 'fontweight':5, 'color':'Brown'})
+plt.title("Month-Wise Booking", fontdict={'fontsize':20, 'fontweight':5, 'color':'Green'})
+
+#CHART-10
+plt.figure(figsize=(8,5))
+hotel_wise_revenue = database.groupby('hotel')['revenue'].sum()
+hotel_wise_revenue
+ax = hotel_wise_revenue.plot(kind = 'bar', color=('b','y'))
+plt.xlabel("Hotel", fontdict={'fontsize':12, 'fontweight':5, 'color':'Brown'})
+plt.ylabel("Total Revenue", fontdict={'fontsize':12, 'fontweight':5, 'color':'Brown'})
+plt.title("Total Revenue", fontdict={'fontsize':12, 'fontweight':5, 'color':'Green'})
+
+#CHART-11
+average_adr = database.groupby('hotel')['adr'].mean()
+average_adr
+plt.subplots(figsize=(8,5))
+average_adr.plot(kind = 'barh', color =('g','r'))
+plt.xlabel("Average ADR", fontdict={'fontsize':12, 'fontweight':5, 'color':'Brown'})
+plt.ylabel("Hotel Name", fontdict={'fontsize':12, 'fontweight':5, 'color':'Brown'})
+plt.title("Average ADR of Hotel", fontdict={'fontsize':12, 'fontweight':5, 'color':'Green'})
+
+
+#CHART-12
+plt.figure(figsize=(12,6))
+sns.scatterplot(y='total_stay_in_nights', x='adr' , data=database[database['adr']<1000])
+plt.show()
+
+
+plt.figure(figsize=(12,10), dpi = 100)
+hotel_wise_meal = database.groupby(['hotel', 'meal'])['meal'].count().unstack()
+hotel_wise_meal.plot(kind = 'bar', fontsize=(12))
+hotel_wise_meal
+
+#CHART-14
+corr_df=database[['lead_time','previous_cancellations','previous_bookings_not_canceled','total_guest',
+                  'booking_changes','days_in_waiting_list','adr','required_car_parking_spaces','total_of_special_requests']].corr()
+                
+f, ax = plt.subplots(figsize=(12,12))
+sns.heatmap(corr_df, annot = True, fmt='.2f', annot_kws={'size':10}, vmax=1, square=True, cmap='YlGnBu')
+
+
+
